@@ -47,21 +47,26 @@ class PagePresenter {
       console.error("PagePresenter: Elemen konten aplikasi (#app-content) tidak ditemukan.");
       return;
     }
-    this._cleanupPreviousResources();
+    this._cleanupPreviousResources(); // Panggil cleanup sebelum render halaman baru
     showHomeLoading(this._appContentElement);
 
     try {
-      // Cek token sebelum fetch, meskipun fetchWithAuth juga akan handle 401
-      // Router juga sudah melakukan ini, jadi ini lapisan tambahan jika diakses langsung.
+      // Pengecekan token juga dilakukan oleh router sebelum memanggil method ini,
+      // dan oleh fetchWithAuth saat melakukan call API.
+      // Baris if di bawah ini adalah lapisan tambahan jika method ini dipanggil langsung.
       if (!localStorage.getItem('userToken')) {
-          window.location.hash = '#/login';
+          // Router seharusnya sudah mengarahkan, tapi ini safeguard
+          console.warn('PagePresenter (showHomePage): No user token found, should be redirected by router.');
+          window.location.hash = '#/login'; 
           return;
       }
       const stories = await getAllStories(); // Menggunakan parameter default dari model
       renderHome(this._appContentElement, stories);
     } catch (error) {
-      // Jika error adalah karena redirect dari fetchWithAuth, jangan tampilkan error umum lagi
-      if (!error.message.startsWith('Unauthorized:')) {
+      // Jika error adalah karena redirect dari fetchWithAuth (misalnya token kedaluwarsa),
+      // fetchWithAuth sudah mengurus redirect dan melempar error 'Unauthorized:'.
+      // Kita hanya menangani error lain di sini.
+      if (error && error.message && !error.message.startsWith('Unauthorized:')) {
         console.error('PagePresenter: Gagal menampilkan halaman beranda:', error);
         showHomeError(this._appContentElement, error.message || 'Gagal memuat cerita.');
       }
@@ -76,8 +81,8 @@ class PagePresenter {
       console.error("PagePresenter: Elemen konten aplikasi (#app-content) tidak ditemukan.");
       return;
     }
-    // Cek token, router juga sudah melakukan ini
     if (!localStorage.getItem('userToken')) {
+        console.warn('PagePresenter (showAddStoryPage): No user token found, should be redirected by router.');
         window.location.hash = '#/login';
         return;
     }
@@ -119,8 +124,8 @@ class PagePresenter {
     }
 
     const description = descriptionInput.value.trim();
-    const lat = latitudeInput ? latitudeInput.value.trim() : undefined;
-    const lon = longitudeInput ? longitudeInput.value.trim() : undefined;
+    const lat = latitudeInput ? latitudeInput.value.trim() : ''; // Kirim string kosong jika tidak diisi
+    const lon = longitudeInput ? longitudeInput.value.trim() : ''; // Kirim string kosong jika tidak diisi
     let photoToSubmit = null;
 
     if (photoSource === 'camera' && capturedBlob) {
@@ -137,11 +142,11 @@ class PagePresenter {
     }
 
     try {
-      const response = await addNewStory(description, photoToSubmit, lat, lon);
+      const response = await addNewStory(description, photoToSubmit, lat || undefined, lon || undefined); // Kirim undefined jika string kosong
       showAddStoryLoading(false);
       alert(`Cerita berhasil ditambahkan! Pesan: ${response.message}`);
       
-      form.reset();
+      form.reset(); // Reset semua field
       const imagePreview = form.querySelector('#image-preview');
       if (imagePreview) {
           imagePreview.style.display = 'none';
@@ -150,6 +155,7 @@ class PagePresenter {
       if (document.getElementById('story-latitude')) document.getElementById('story-latitude').value = '';
       if (document.getElementById('story-longitude')) document.getElementById('story-longitude').value = '';
       
+      // Reset UI Kamera dan Peta
       const cameraArea = form.querySelector('#camera-area');
       if (cameraArea) cameraArea.style.display = 'none';
       const cameraControls = form.querySelector('#camera-controls');
@@ -159,11 +165,11 @@ class PagePresenter {
       const toggleMapButton = form.querySelector('#toggle-map-picker');
       if (toggleMapButton) toggleMapButton.textContent = 'Ambil Lokasi dari Peta';
 
-      this._cleanupPreviousResources();
+      this._cleanupPreviousResources(); // Bersihkan resource aktif setelah sukses
       window.location.hash = '#/';
     } catch (error) {
       showAddStoryLoading(false);
-      if (!error.message.startsWith('Unauthorized:')) {
+      if (error && error.message && !error.message.startsWith('Unauthorized:')) {
         showAddStoryError(error.message || 'Gagal menambahkan cerita.');
       }
     }
@@ -216,9 +222,9 @@ class PagePresenter {
         localStorage.setItem('userName', response.loginResult.name);
         alert('Login berhasil!');
         window.location.hash = '#/';
-        // updateNavigation() akan dipanggil oleh event hashchange
+        // updateNavigation() akan dipanggil oleh event hashchange di main.js
       } else {
-        showLoginError(response.message || 'Login gagal.');
+        showLoginError(response.message || 'Login gagal. Periksa kredensial Anda.');
       }
     } catch (error) {
       showLoginLoading(false);
@@ -279,11 +285,10 @@ class PagePresenter {
         showRegisterSuccess(response.message + " Silakan login.");
         form.reset();
         setTimeout(() => {
-            // Hanya redirect jika pengguna masih di halaman register & belum ada token (jaga-jaga)
             if(window.location.hash === '#/register' && !localStorage.getItem('userToken')) {
                  window.location.hash = '#/login';
             }
-        }, 2500); // Beri waktu pengguna membaca pesan sukses
+        }, 2500);
       } else {
         showRegisterError(response.message || 'Pendaftaran gagal.');
       }
