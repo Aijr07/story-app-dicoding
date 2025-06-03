@@ -1,435 +1,260 @@
-/* Vite Defaults & Root Variables */
+/* src/style.css */
+
+/* Variabel Dasar dan Tema Awal (Sebagian dari Vite Default) */
 :root {
-  /* ... variabel font dan sistem dari Vite ... */
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
 
-  /* Variabel Warna Kustom dari Palet Pilihan Anda */
-  --warna-primer: #2D4059;        /* Contoh: Biru Tua Gelap */
-  --warna-sekunder: #EA5455;      /* Contoh: Merah Koral */
-  --warna-aksen: #F07B3F;         /* Contoh: Oranye */
-  --warna-latar-terang: #F5F5F5;  /* Contoh: Abu-abu Sangat Muda */
-  --warna-teks-gelap: #333333;    /* Contoh: Hitam Pekat */
-  --warna-teks-terang: #FFFFFF;   /* Contoh: Putih */
-  --warna-border: #DDDDDD;       /* Contoh: Abu-abu Muda untuk border */
+  color-scheme: light dark; /* Mendukung preferensi sistem untuk light/dark */
+  
+  /* Variabel Warna Kustom dari Palet Pilihan Anda (Contoh) */
+  --font-utama: 'Roboto', sans-serif; /* Ganti jika Anda sudah memilih font lain */
+  --font-judul: 'Montserrat', sans-serif; /* Ganti jika Anda sudah memilih font lain */
 
-  /* Sesuaikan dengan variabel warna dari Vite jika ingin integrasi */
-  /* Misalnya, untuk dark mode default dari Vite: */
-  color-scheme: light dark; /* Biarkan ini */
-  /* color: var(--warna-teks-terang); /* Menggunakan variabel kustom untuk dark mode text */
-  /* background-color: var(--warna-primer); /* Menggunakan variabel kustom untuk dark mode bg */
-  /* Di atas adalah contoh jika Anda ingin :root defaultnya gelap menggunakan palet Anda */
-  /* Atau, biarkan default Vite dan timpa di elemen spesifik */
+  --warna-primer: #2D4059;        /* Contoh: Biru Tua Gelap (untuk sidebar, footer) */
+  --warna-sekunder: #EA5455;      /* Contoh: Merah Koral (untuk tombol utama, aksen) */
+  --warna-aksen: #F07B3F;         /* Contoh: Oranye (untuk highlight atau link) */
+  
+  --warna-latar-aplikasi: #f0f2f5; /* Latar body keseluruhan yang lebih netral */
+  --warna-konten-utama: #ffffff; /* Latar area konten utama (main) */
+
+  --warna-teks-gelap: #212529;    /* Teks utama di latar terang */
+  --warna-teks-sedang: #495057;   /* Teks sekunder */
+  --warna-teks-terang: #ffffff;   /* Teks utama di latar gelap (sidebar, footer) */
+  --warna-border: #dee2e6;       /* Border yang lebih halus */
+  
+  --lebar-sidebar: 260px;
 }
 
+/* Pengaturan untuk skema warna terang (jika preferensi sistem adalah terang) */
 @media (prefers-color-scheme: light) {
   :root {
-    color: #213547;
-    /* Variabel warna bisa di-override di sini jika skema terang beda signifikan */
-    /* Jika body sudah diatur terang, ini mungkin tidak banyak mengubah tampilan body, */
-    /* tapi bisa mempengaruhi elemen lain yang menggunakan var() dari :root Vite */
+    /* Variabel ini akan digunakan jika elemen menggunakan var() dari :root Vite */
+    /* Kita lebih banyak override langsung di body dan komponen untuk tema terang aplikasi kita */
+    --vite-color-text: #213547;
+    --vite-color-background: #ffffff;
   }
-  /* Anda juga bisa menargetkan elemen spesifik di sini untuk light mode */
-  /* body {
-    background-color: var(--warna-latar-terang);
-    color: var(--warna-teks-gelap);
-  } */
+  /* Anda bisa menambahkan override spesifik untuk light mode di sini jika perlu */
 }
 
-/* General Application Body Style */
+/* Reset Dasar & Body Styling */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
 body {
-  font-family: sans-serif;
+  font-family: var(--font-utama);
   margin: 0;
-  background-color: var(--warna-latar-terang); /* Latar utama aplikasi */
-  color: var(--warna-teks-gelap);           /* Warna teks utama */
-  min-width: 320px;
-  min-height: 100vh;
+  background-color: var(--warna-latar-aplikasi);
+  color: var(--warna-teks-gelap);
+  padding-left: var(--lebar-sidebar); /* Ruang untuk fixed sidebar */
   display: flex;
   flex-direction: column;
+  min-height: 100vh;
 }
 
-/* Default Link Styles (from Vite) */
-a {
+/* Skip to Content Link */
+.skip-to-content-link {
+  position: fixed; /* Fixed agar selalu di atas kiri viewport, di luar alur sidebar */
+  top: -100px; 
+  left: 10px;
+  background-color: var(--warna-sekunder);
+  color: var(--warna-teks-terang);
+  padding: 10px 15px;
+  z-index: 10001; /* Di atas sidebar */
+  text-decoration: none;
+  border-radius: 0 0 5px 5px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  transition: top 0.3s ease;
+}
+.skip-to-content-link:focus {
+  top: 0;
+}
+
+/* Header (Sidebar) Styling */
+header.sidebar {
+  width: var(--lebar-sidebar);
+  background-color: var(--warna-primer);
+  color: var(--warna-teks-terang);
+  padding: 20px;
+  height: 100vh;
+  position: fixed;
+  left: 0;
+  top: 0;
+  overflow-y: auto;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 3px 0px 10px rgba(0, 0, 0, 0.1);
+
+  /* Untuk Kriteria Wajib 6 / Opsional 3: View Transition */
+  view-transition-name: app-sidebar; /* Nama unik untuk transisi sidebar */
+}
+
+header.sidebar h1 {
+  font-family: var(--font-judul);
+  font-size: 1.7em; /* Sedikit disesuaikan */
+  margin: 0 0 25px 0;
+  color: var(--warna-teks-terang);
+  text-align: center;
+  font-weight: 700;
+}
+
+header.sidebar nav#main-navigation a {
+  display: block;
+  color: rgba(255, 255, 255, 0.85); /* Warna link sedikit lebih lembut */
+  padding: 12px 15px;
+  margin: 8px 0;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  font-size: 0.95em;
+}
+header.sidebar nav#main-navigation a:hover,
+header.sidebar nav#main-navigation a:focus {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: var(--warna-teks-terang);
+  outline: none;
+}
+
+header.sidebar #user-info {
+  padding: 15px 0;
+  margin-top: auto; /* Mendorong ke bawah */
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 0.9em;
+}
+header.sidebar #user-info p {
+  margin: 0 0 10px 0;
+  text-align: center;
+}
+header.sidebar #user-info a { /* Link Login/Register di sidebar */
+  color: var(--warna-aksen);
+  text-decoration: none;
   font-weight: 500;
-  color: #646cff; /* Vite default link color */
-  text-decoration: inherit;
+}
+header.sidebar #user-info a:hover {
+  text-decoration: underline;
+}
+header.sidebar #user-info button#logout-button {
+  background-color: var(--warna-sekunder);
+  color: var(--warna-teks-terang);
+  border: none;
+  padding: 10px;
+  width: 100%;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9em;
+  font-weight: 500;
+  transition: opacity 0.2s ease;
+}
+header.sidebar #user-info button#logout-button:hover {
+  opacity: 0.85;
+}
+
+/* Main Content Styling */
+main#app-content {
+  flex-grow: 1;
+  padding: 25px 30px; /* Padding sedikit lebih besar */
+  background-color: var(--warna-konten-utama);
+  /* margin-left sudah dihandle oleh padding-left di body */
+  /* Memberi ruang untuk footer jika footer tidak fixed */
+  padding-bottom: calc(3em + 30px); /* Tinggi footer perkiraan + padding */
+}
+
+/* Footer Styling */
+footer {
+  text-align: center;
+  padding: 1.5em 20px;
+  background-color: var(--warna-primer);
+  color: var(--warna-teks-terang);
+  flex-shrink: 0;
+  font-size: 0.85em;
+  /* margin-left sudah dihandle oleh padding-left di body */
+}
+footer p {
+  margin: 0;
+}
+
+/* Page Header dalam main content */
+.page-header {
+  border-bottom: 1px solid var(--warna-border);
+  padding-bottom: 15px;
+  margin-bottom: 25px;
+}
+.page-header h1 {
+  font-family: var(--font-judul);
+  font-size: 2em; /* Disesuaikan */
+  line-height: 1.2;
+  color: var(--warna-teks-gelap);
+  margin: 0;
+}
+.page-header p {
+    font-size: 1em;
+    color: var(--warna-teks-sedang);
+    margin-top: 5px;
+}
+
+/* Link Umum (di luar sidebar) */
+a {
+  color: var(--warna-aksen); /* Menggunakan warna aksen untuk link */
+  text-decoration: none; /* Hapus underline default, bisa ditambahkan pada hover jika mau */
 }
 a:hover {
-  color: #535bf2; /* Vite dark mode link hover */
+  text-decoration: underline;
+  filter: brightness(90%);
 }
 
-/* Default H1 Style (from Vite) */
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-/* Default Button Style (from Vite) */
-button {
-  border-radius: 8px;
+/* Tombol Umum (basis dari Vite, disesuaikan) */
+button, .button { /* Menargetkan semua button dan elemen dengan kelas .button */
+  border-radius: 6px; /* Disesuaikan */
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  padding: 0.7em 1.3em; /* Disesuaikan */
+  font-size: 0.95em; /* Disesuaikan */
   font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a; /* Vite dark mode button bg */
-  color: rgba(255, 255, 255, 0.87); /* Vite dark mode button text */
+  font-family: var(--font-utama);
   cursor: pointer;
-  transition: border-color 0.25s, background-color 0.25s;
+  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+  line-height: 1.2; /* Perbaikan line height untuk tombol */
 }
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-/* Application Layout: App Container & Sidebar */
-.app-container {
-  display: flex;
-  flex-grow: 1; /* Added to make app-container take available space for footer */
-  /* min-height: calc(100vh - 70px); /* Adjust 70px if footer height changes, or use flex for body */
+button:focus, .button:focus,
+button:focus-visible, .button:focus-visible {
+  outline: 2px auto var(--warna-aksen); /* Outline lebih jelas */
+  outline-offset: 2px;
 }
 
-.sidebar {
-  background-color: var(--warna-primer); /* atau warna lain yang sesuai dari palet Anda */
-  color: var(--warna-teks-terang);
-  width: 250px; /* Atau lebar yang Anda inginkan */
-  flex-shrink: 0;
-}
+/* Kelas Tombol Spesifik Aplikasi */
 .button--primary {
-  background-color: var(--warna-sekunder); /* atau warna aksen */
+  background-color: var(--warna-sekunder);
   color: var(--warna-teks-terang);
   border-color: var(--warna-sekunder);
 }
-
-
-.sidebar h1 {
-  margin-top: 0;
-  font-size: 1.8em; /* Adjusted for sidebar context */
-  line-height: 1.2;
-}
-
-.sidebar nav a {
-  display: block;
-  color: white;
-  padding: 10px 0;
-  margin: 5px 0;
-  text-decoration: none;
-  font-weight: normal; /* Override Vite's default 'a' font-weight if needed */
-}
-.sidebar nav a:hover {
-  background-color: #555;
-  color: white; /* Ensure hover color remains white */
-  text-decoration: none; /* Ensure no underline on hover if not desired */
-}
-
-/* Application Header (if used separately from sidebar) */
-header {
-  background-color: #333;
-  color: white;
-  padding: 1em;
-  text-align: center;
-}
-
-header nav a {
-  color: white;
-  margin: 0 10px;
-  text-decoration: none;
-}
-header nav a:hover {
-  text-decoration: underline;
-  color: white; /* Ensure hover color remains white */
-}
-
-/* Main Content Area */
-main#app-content {
-  flex-grow: 1; /* Allows main content to take available space */
-  padding: 20px;
-  max-width: 1200px;
-  margin-left: 0; /* Adjusted assuming sidebar is present */
-  margin-right: auto;
-  background-color: white; /* Content background */
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
-  
-  /* If sidebar is NOT used, and header is above, uncomment next line */
-  /* margin: 20px auto; */
-}
-/* If .app-container is not used, and you have a top header, then main#app-content might need: */
-/*
-main#app-content {
-  padding: 20px;
-  max-width: 1200px;
-  margin: 20px auto;
-  background-color: white;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
-*/
-
-
-/* Footer */
-footer {
-  text-align: center;
-  padding: 1em 0;
-  background-color: #333;
-  color: white;
-  width: 100%;
-  flex-shrink: 0; /* Prevent footer from shrinking */
-  /* position: relative; */ /* Not needed if body is flex column */
-  /* bottom: 0; */
-}
-
-/* Page Header within main content */
-.page-header {
-  border-bottom: 1px solid #eee;
-  padding-bottom: 10px;
-  margin-bottom: 20px;
-}
-.page-header h1 { /* More specific H1 styling for page headers */
-    font-size: 2.2em;
-    line-height: 1.2;
-}
-
-
-/* Story List Styles */
-.story-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Responsif secara default */
-  gap: 20px;
-}
-
-.story-item {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  overflow: hidden;
-  background-color: #fff;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-  transition: transform 0.2s ease-in-out;
-  display: flex; /* Added for better internal alignment */
-  flex-direction: column; /* Added for better internal alignment */
-}
-
-.story-item:hover {
-  transform: translateY(-5px);
-}
-
-.story-item__image {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  display: block;
-}
-
-.story-item__content {
-  padding: 15px;
-  flex-grow: 1; /* Allows content to fill space if items have varying text length */
-  display: flex;
-  flex-direction: column;
-}
-
-.story-item__title {
-  margin-top: 0;
-  margin-bottom: 10px;
-  font-size: 1.25em;
-  color: #007bff;
-  line-height: 1.3; /* Adjusted */
-}
-
-.story-item__description {
-  font-size: 0.9em;
-  line-height: 1.5;
-  margin-bottom: 10px;
-  color: #555;
-  flex-grow: 1; /* Allows description to take up available space */
-}
-
-.story-item__date,
-.story-item__location {
-  font-size: 0.8em;
-  color: #777;
-  margin-top: auto; /* Pushes date/location to bottom if description is short */
-}
-.story-item__location {
-  font-style: italic;
-}
-
-
-/* Loading, Error, No-Stories Messages */
-.loading-indicator, .error-message, .no-stories {
-  text-align: center;
-  padding: 20px;
-  font-size: 1.2em;
-  color: #777;
-}
-.spinner {
-  border: 4px solid rgba(0,0,0,.1);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border-left-color: #007bff;
-  animation: spin 1s linear infinite;
-  margin: 20px auto;
-}
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-/* Specific button for error messages */
-.error-message button {
-  padding: 10px 15px;
-  background-color: #007bff; /* Overrides Vite's default button */
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 1em;
-  margin-top: 10px;
-}
-.error-message button:hover {
-  background-color: #0056b3;
-}
-
-/* Form Add Story Styles (from previous step) */
-.add-story-form {
-  max-width: 600px;
-  margin: 0 auto 20px auto; /* Centered, with bottom margin */
-  padding: 20px;
-  background-color: #f9f9f9;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  font-weight: bold;
-}
-
-.form-group input[type="file"],
-.form-group input[type="text"],
-.form-group textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  box-sizing: border-box;
-  background-color: #fff; /* Ensure form inputs have light background */
-  color: #333; /* Ensure form input text is dark */
-}
-.form-group input[type="file"] {
-    background-color: transparent; /* Or specific style for file input */
-    padding: 3px; /* Adjust padding for file input */
-}
-
-
-.form-group textarea {
-  resize: vertical;
-}
-
-.form-actions {
-  margin-top: 20px;
-  text-align: right;
-}
-
-/* General Button Classes for the App */
-.button {
-  padding: 10px 15px;
-  /* border: none; */ /* Vite already sets border: 1px solid transparent */
-  border-radius: 4px; /* Slightly different from Vite's 8px, choose one */
-  cursor: pointer;
-  font-size: 1em; /* Vite default is 1em */
-  /* font-weight: 500; */ /* Inherits from Vite's button */
-  /* font-family: inherit; */ /* Inherits from Vite's button */
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-}
-
-.button--primary {
-  background-color: #007bff;
-  color: white;
-  border-color: #007bff; /* Match background */
-}
 .button--primary:hover {
-  background-color: #0056b3;
-  border-color: #0056b3;
+  background-color: var(--warna-sekunder); /* Warna tetap, opacity diatur di :hover umum */
+  opacity: 0.85;
+  border-color: var(--warna-sekunder);
 }
 .button--primary:disabled {
   background-color: #cccccc;
   border-color: #cccccc;
   color: #666666;
   cursor: not-allowed;
+  opacity: 0.7;
 }
 
 .button--secondary {
-  background-color: #6c757d;
-  color: white;
-  border-color: #6c757d; /* Match background */
+  background-color: #6c757d; /* Abu-abu netral */
+  color: var(--warna-teks-terang);
+  border-color: #6c757d;
 }
 .button--secondary:hover {
-  background-color: #545b62;
+  background-color: #5a6268;
   border-color: #545b62;
 }
 
-#loading-indicator-add {
-  display: inline-block;
-  margin-right: 10px;
-  font-style: italic;
-  color: #555; /* Match other text color */
-}
-
-.error-message-form {
-  color: #dc3545;
-  font-size: 0.9em;
-  margin-top: 5px;
-  text-align: left;
-}
-
-/* Leaflet Map Specific Styles (from previous step) */
-.story-item__location-controls {
-  margin-top: 15px;
-  padding-top: 10px;
-  border-top: 1px solid #eee;
-}
-
-.view-map-button { /* This is a specific button, can use .button .button--secondary */
-  /* background-color: #28a745; */ /* Using .button--secondary or another class is better */
-  /* color: white; */
-  /* border: none; */
-  /* padding: 8px 12px; */
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-  /* font-size: 0.9em; */
-  /* border-radius: 4px; */
-  /* cursor: pointer; */
-  /* transition: background-color 0.3s ease; */
-}
-/* .view-map-button:hover {
-  background-color: #218838;
-} */
-
-.story-item__map-container {
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  transition: height 0.3s ease-in-out;
-  background-color: #e9e9e9; /* Placeholder background for map container */
-}
-
-/* Styles for map picker in add story form */
-#map-picker-container {
-    background-color: #e9e9e9; /* Placeholder background */
-}
-
-/* src/style.css */
-#camera-area video {
-  background-color: #000; /* Latar belakang hitam untuk video */
-}
-.button--danger { /* Tombol untuk aksi destruktif seperti tutup kamera */
-  background-color: #dc3545;
-  color: white;
+.button--danger {
+  background-color: #dc3545; /* Merah untuk bahaya */
+  color: var(--warna-teks-terang);
   border-color: #dc3545;
 }
 .button--danger:hover {
@@ -437,19 +262,192 @@ footer {
   border-color: #bd2130;
 }
 
-.skip-to-content-link {
-  position: absolute;
-  top: -100px; /* Sembunyikan di luar layar */
-  left: 0;
-  background-color: #007bff; /* Warna latar yang kontras */
-  color: white;
-  padding: 10px 15px;
-  z-index: 9999; /* Pastikan di atas elemen lain */
-  text-decoration: none;
-  border-radius: 0 0 5px 0; /* Sedikit style */
-  transition: top 0.3s ease;
+
+/* Story List Styles */
+.story-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); /* Ukuran min sedikit lebih kecil */
+  gap: 25px; /* Gap sedikit lebih besar */
+}
+.story-item {
+  border: 1px solid var(--warna-border);
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: var(--warna-konten-utama);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.08); /* Shadow lebih halus */
+  transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+}
+.story-item:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.12);
+}
+.story-item__image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+  background-color: #eee; /* Placeholder bg untuk gambar */
+}
+.story-item__content {
+  padding: 15px 20px; /* Padding disesuaikan */
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+.story-item__title {
+  font-family: var(--font-judul);
+  margin-top: 0;
+  margin-bottom: 8px; /* Disesuaikan */
+  font-size: 1.2em; /* Disesuaikan */
+  color: var(--warna-primer); /* Judul item menggunakan warna primer */
+  font-weight: 700;
+  line-height: 1.3;
+}
+.story-item__description {
+  font-size: 0.9em;
+  line-height: 1.6; /* Line height lebih nyaman */
+  margin-bottom: 12px;
+  color: var(--warna-teks-sedang);
+  flex-grow: 1;
+}
+.story-item__date,
+.story-item__location {
+  font-size: 0.8em;
+  color: #888; /* Warna lebih lembut untuk meta */
+  margin-top: auto; /* Mendorong ke bawah */
+}
+.story-item__location {
+  font-style: italic;
+  margin-top: 5px; /* Jarak dari tanggal jika keduanya ada */
+}
+.story-item__location-controls {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--warna-border);
+}
+.story-item__map-container {
+  border: 1px solid var(--warna-border);
+  border-radius: 4px;
+  transition: height 0.3s ease-in-out;
+  background-color: var(--warna-latar-aplikasi);
 }
 
-.skip-to-content-link:focus {
-  top: 0; /* Tampilkan saat mendapatkan fokus */
+
+/* Loading, Error, No-Stories Messages */
+.loading-indicator, .error-message, .no-stories {
+  text-align: center;
+  padding: 30px 20px;
+  font-size: 1.1em;
+  color: var(--warna-teks-sedang);
+}
+.spinner {
+  border: 4px solid rgba(0,0,0,.1);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border-left-color: var(--warna-sekunder); /* Spinner menggunakan warna sekunder */
+  animation: spin 1s linear infinite;
+  margin: 20px auto;
+}
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.error-message button { /* Tombol di dalam pesan error (mis. Coba Lagi) */
+  background-color: var(--warna-sekunder);
+  /* ... styling lain untuk tombol ini jika beda dari .button--primary ... */
+}
+
+
+/* Form Add Story Styles */
+.add-story-form {
+  max-width: 650px; /* Sedikit lebih lebar */
+  margin: 0 auto 30px auto;
+  padding: 25px 30px;
+  background-color: var(--warna-konten-utama); /* Form di atas latar utama */
+  border: 1px solid var(--warna-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+}
+.form-group {
+  margin-bottom: 20px; /* Jarak antar grup lebih besar */
+}
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500; /* Sedikit lebih tebal dari body text biasa */
+  font-size: 0.9em;
+  color: var(--warna-teks-sedang);
+}
+.form-group input[type="file"],
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group textarea {
+  width: 100%;
+  padding: 12px 15px; /* Padding input lebih nyaman */
+  border: 1px solid var(--warna-border);
+  border-radius: 6px;
+  box-sizing: border-box;
+  background-color: #fff;
+  color: var(--warna-teks-gelap);
+  font-family: var(--font-utama);
+  font-size: 0.95em;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.form-group input[type="file"] {
+  padding: 8px; /* Padding khusus untuk file input */
+}
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus,
+.form-group input[type="password"]:focus,
+.form-group textarea:focus {
+    border-color: var(--warna-aksen);
+    box-shadow: 0 0 0 0.2rem rgba(var(--warna-aksen-rgb, 240, 123, 63), 0.25); /* Ganti F07B3F ke RGB untuk rgba */
+    outline: none;
+}
+.form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+.form-group small { /* Untuk hint seperti "Minimal 8 karakter" */
+    font-size: 0.8em;
+    color: var(--warna-teks-sedang);
+    display: block;
+    margin-top: 4px;
+}
+.form-actions {
+  margin-top: 25px;
+  text-align: right;
+}
+#loading-indicator-add { /* Indikator loading di form tambah */
+  display: inline-block;
+  margin-right: 10px;
+  font-style: italic;
+  color: var(--warna-teks-sedang);
+}
+.error-message-form { /* Pesan error spesifik form */
+  color: #dc3545;
+  font-size: 0.9em;
+  margin-top: 8px;
+  text-align: left; /* Error di bawah field atau area khusus */
+  display: block; /* Pastikan block untuk margin-top */
+}
+/* Styling untuk input file yang dikustomisasi dengan label */
+label[for="story-photo"].button {
+    display: inline-block; /* Agar bisa di-style seperti tombol */
+    padding: 0.7em 1.3em;
+}
+
+
+/* Styling untuk Kamera & Peta di Form Tambah Cerita */
+#camera-area video {
+  background-color: #000;
+  border-radius: 4px;
+}
+#map-picker-container {
+  background-color: var(--warna-latar-aplikasi); /* Atau warna lain untuk placeholder peta */
+  border-radius: 4px;
 }
