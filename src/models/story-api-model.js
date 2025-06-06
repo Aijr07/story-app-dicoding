@@ -154,4 +154,31 @@ async function addNewStory(description, photo, lat, lon) {
   }
 }
 
-export { registerUser, loginUser, getAllStories, addNewStory };
+async function subscribeToNotifications(subscription) {
+  // API Anda mengharapkan data 'endpoint', 'p256dh', dan 'auth'
+  // Objek subscription perlu disederhanakan sebelum dikirim
+  const subJSON = subscription.toJSON();
+  const payload = {
+      endpoint: subJSON.endpoint,
+      keys: {
+          p256dh: subJSON.keys.p256dh,
+          auth: subJSON.keys.auth,
+      }
+  };
+
+  try {
+    // Gunakan fetchWithAuth karena endpoint ini memerlukan otorisasi
+    const response = await fetchWithAuth(`${BASE_URL}/notifications/subscribe`, {
+      method: 'POST',
+      body: JSON.stringify(payload), // Kirim sebagai JSON
+    });
+
+    console.log('Respons dari server setelah subscribe notifikasi:', response);
+    return response;
+  } catch (error) {
+    console.error('Gagal mengirim subscription ke server:', error);
+    throw error;
+  }
+}
+
+export { registerUser, loginUser, getAllStories, addNewStory, subscribeToNotifications };
