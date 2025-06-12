@@ -1,14 +1,16 @@
-// Impor router untuk mengaktifkan semua logika routing
+// src/main.js
+
+// --- IMPORTS ---
 import './routes/router.js';
-// Impor fungsi untuk notifikasi
 import { requestPermissionAndSubscribe } from './utils/push-notification-helper.js';
+// Mengimpor modul database kita
+import StoryAppDB from './js/db.js';
 
 // --- CONSTANTS ---
-// Mendefinisikan kunci localStorage sebagai konstanta untuk menghindari salah ketik
 const AUTH_TOKEN_KEY = 'userToken';
 const USER_NAME_KEY = 'userName';
 
-// --- FUNGSI UTAMA ---
+// --- FUNGSI UTAMA & INTERAKSI DATA ---
 
 /**
  * Mengambil token autentikasi dari localStorage.
@@ -19,81 +21,101 @@ function getAuthToken() {
 }
 
 /**
- * Mengambil semua cerita dari API menggunakan token yang tersimpan.
- * Jika berhasil, akan memanggil fungsi untuk merender cerita ke layar.
+ * Mengambil cerita dari API (online) atau dari IndexedDB (offline).
  */
 async function fetchAndDisplayStories() {
   const token = getAuthToken();
-  // Jika tidak ada token (pengguna belum login), kosongkan konten dan berhenti.
   if (!token) {
-    console.log('Main.js: Pengguna belum login, tidak mengambil cerita.');
-    renderStories([]); // Memastikan kontainer cerita kosong
+    console.log('Main.js: Pengguna belum login.');
+    renderStories([]);
     return;
   }
 
   try {
+    // --- MODE ONLINE: Ambil dari API ---
     const response = await fetch('https://story-api.dicoding.dev/v1/stories', {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
+      headers: { 'Authorization': `Bearer ${token}` },
     });
 
     if (response.status === 401) {
-      console.warn('Main.js: Token tidak valid atau kedaluwarsa. Logout paksa.');
-      handleLogout(); // Paksa logout jika token tidak valid
+      handleLogout(); // Token tidak valid, paksa logout
       return;
     }
-
     const data = await response.json();
-
     if (data.error) {
-      console.error('Main.js: Gagal mengambil cerita dari API:', data.message);
-      return;
+      throw new Error(data.message);
     }
 
-    // Panggil fungsi untuk menampilkan cerita ke DOM
+    console.log('Main.js: Data berhasil diambil dari API.');
+    // 1. MENYIMPAN DATA: Simpan setiap cerita ke IndexedDB
+    data.listStory.forEach(story => {
+      StoryAppDB.putStory(story);
+    });
+
+    // Tampilkan data yang baru diambil
     renderStories(data.listStory);
     
   } catch (error) {
-    console.error('Main.js: Terjadi kesalahan jaringan saat mengambil cerita:', error);
-    // Di sini Anda bisa mencoba mengambil data dari IndexedDB sebagai fallback
-    console.log('Main.js: Mencoba mengambil data dari IndexedDB...');
-    // const storiesFromDb = await getAllData(); // Asumsi Anda punya fungsi ini dari db.js
-    // renderStories(storiesFromDb);
+    // --- MODE OFFLINE: Ambil dari IndexedDB ---
+    console.error('Main.js: Gagal fetch dari API, mencoba mengambil dari IndexedDB.', error);
+    // 2. MENAMPILKAN DATA (OFFLINE)
+    const storiesFromDb = await StoryAppDB.getAllStories();
+    console.log('Main.js: Data dari IndexedDB akan ditampilkan.');
+    renderStories(storiesFromDb);
   }
 }
 
 /**
- * Merender daftar cerita ke dalam kontainer di halaman.
+ * Merender daftar cerita ke DOM, lengkap dengan tombol Hapus.
  * @param {Array} stories - Array berisi objek cerita.
  */
 function renderStories(stories = []) {
-  // Pastikan ID ini ada di file HTML Anda, biasanya di dalam home-view.
-  const storyContainer = document.getElementById('story-list-container'); 
+  const storyContainer = document.getElementById('story-list-container');
   if (!storyContainer) {
-    // Ini normal jika kita sedang tidak di halaman utama
+    // Ini normal jika pengguna tidak sedang di halaman utama.
     return;
   }
 
-  storyContainer.innerHTML = ''; // Kosongkan kontainer
-
+  storyContainer.innerHTML = ''; // Selalu kosongkan kontainer sebelum merender
   if (stories.length === 0) {
-    storyContainer.innerHTML = '<p>Belum ada cerita untuk ditampilkan atau Anda perlu login.</p>';
+    storyContainer.innerHTML = '<p>Belum ada cerita untuk ditampilkan.</p>';
     return;
   }
 
   stories.forEach(story => {
     const storyElement = document.createElement('div');
-    storyElement.classList.add('card'); // Asumsi Anda punya class .card di CSS
+    storyElement.classList.add('card');
     storyElement.innerHTML = `
       <h3>${story.name}</h3>
       <img src="${story.photoUrl}" alt="Foto cerita dari ${story.name}" style="width:100%;">
       <p>${story.description}</p>
+      <button class="button-delete" data-id="${story.id}">Hapus</button>
     `;
     storyContainer.appendChild(storyElement);
   });
 }
+
+/**
+ * Menangani logika penghapusan cerita dari IndexedDB.
+ */
+async function handleDeleteStory(storyId) {
+    if (!storyId) return;
+
+    // Gunakan modal konfirmasi kustom jika ada, jika tidak gunakan confirm() bawaan
+    const confirmation = window.confirm('Apakah Anda yakin ingin menghapus cerita ini?');
+    if (!confirmation) return;
+    
+    // 3. MENGHAPUS DATA
+    await StoryAppDB.deleteStory(storyId);
+    console.log(`Main.js: Cerita ${storyId} dihapus dari IndexedDB.`);
+
+    // Muat ulang daftar cerita dari DB untuk memperbarui tampilan
+    const storiesFromDb = await StoryAppDB.getAllStories();
+    renderStories(storiesFromDb);
+}
+
+// --- FUNGSI UTILITAS UI & NAVIGASI ---
 
 /**
  * Memperbarui elemen navigasi dan info pengguna berdasarkan status login.
@@ -172,6 +194,19 @@ function registerServiceWorker() {
   }
 }
 
+/**
+ * Menyiapkan event listener untuk seluruh aplikasi, termasuk tombol hapus.
+ */
+function setupEventListeners() {
+    // Gunakan event delegation pada body untuk menangani klik pada tombol hapus
+    document.body.addEventListener('click', (event) => {
+        if (event.target && event.target.classList.contains('button-delete')) {
+            const storyId = event.target.dataset.id;
+            handleDeleteStory(storyId);
+        }
+    });
+}
+
 // --- INISIALISASI APLIKASI ---
 
 /**
@@ -182,6 +217,7 @@ function initializeApp() {
   updateNavigation();
   registerServiceWorker();
   fetchAndDisplayStories(); 
+  setupEventListeners(); // Daftarkan event listener untuk tombol hapus
 }
 
 // Event listener utama aplikasi
@@ -190,9 +226,8 @@ window.addEventListener('DOMContentLoaded', initializeApp);
 // Perbarui UI setiap kali URL hash berubah (navigasi SPA)
 window.addEventListener('hashchange', () => {
   updateNavigation();
-  // Karena router Anda memuat konten baru, kita perlu memanggil fetch lagi jika
-  // pengguna navigasi ke halaman utama
-  if(window.location.hash === '' || window.location.hash === '#/'){
+  // Muat cerita jika pengguna kembali ke halaman utama
+  if (window.location.hash === '' || window.location.hash === '#/') {
     fetchAndDisplayStories();
   }
 });
