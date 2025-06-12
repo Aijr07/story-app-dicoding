@@ -182,15 +182,23 @@ function initializeSkipLink() {
 /**
  * Mendaftarkan Service Worker.
  */
+
 function registerServiceWorker() {
+  // Path ke file sw.js, relatif terhadap root domain setelah di-build.
+  // Variabel import.meta.env.BASE_URL secara otomatis akan diisi oleh Vite
+  // dengan nilai 'base' dari vite.config.js ('/story-app-dicoding/').
+  const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(registration => console.log('Service Worker berhasil didaftarkan dengan scope:', registration.scope))
-        .catch(error => console.error('Pendaftaran Service Worker gagal:', error));
+      navigator.serviceWorker.register(swUrl)
+        .then(registration => {
+          console.log('Service Worker berhasil didaftarkan dengan scope:', registration.scope);
+        })
+        .catch(error => {
+          console.error('Pendaftaran Service Worker gagal:', error);
+        });
     });
-  } else {
-    console.log('Browser ini tidak mendukung Service Worker.');
   }
 }
 
