@@ -102,7 +102,6 @@ function renderStories(stories = []) {
 async function handleDeleteStory(storyId) {
     if (!storyId) return;
 
-    // Gunakan modal konfirmasi kustom jika ada, jika tidak gunakan confirm() bawaan
     const confirmation = window.confirm('Apakah Anda yakin ingin menghapus cerita ini?');
     if (!confirmation) return;
     
@@ -160,8 +159,8 @@ function handleLogout() {
   console.log('Main.js: Pengguna logout.');
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(USER_NAME_KEY);
-  updateNavigation(); // Perbarui UI
-  window.location.hash = '#/login'; // Arahkan ke halaman login
+  updateNavigation();
+  window.location.hash = '#/login';
 }
 
 /**
@@ -180,14 +179,14 @@ function initializeSkipLink() {
 }
 
 /**
- * Mendaftarkan Service Worker.
+ * Mendaftarkan Service Worker dengan path yang benar untuk Vite.
  */
-
 function registerServiceWorker() {
-  // Path ke file sw.js, relatif terhadap root domain setelah di-build.
-  // Variabel import.meta.env.BASE_URL secara otomatis akan diisi oleh Vite
-  // dengan nilai 'base' dari vite.config.js ('/story-app-dicoding/').
-  const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+  // Path ke sw.js, ditempatkan di folder 'public' agar konsisten
+  const swUrl = `/sw.js`; 
+  
+  // Jika menggunakan base path di vite.config.js, gunakan cara dinamis:
+  // const swUrl = `${import.meta.env.BASE_URL}sw.js`;
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -199,6 +198,8 @@ function registerServiceWorker() {
           console.error('Pendaftaran Service Worker gagal:', error);
         });
     });
+  } else {
+    console.log('Browser ini tidak mendukung Service Worker.');
   }
 }
 
