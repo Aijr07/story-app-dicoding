@@ -6,5 +6,4 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   // Ganti 'story-app-dicoding' dengan nama repository GitHub Anda.
   // Pastikan untuk menyertakan garis miring di awal dan akhir.
-  base: 'story-app-dicoding',
 });
