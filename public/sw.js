@@ -1,13 +1,13 @@
 // --- IMPORTS DAN KONSTANTA ---
 importScripts('https://cdn.jsdelivr.net/npm/idb@7/build/umd.js');
-importScripts('/src/js/db.js');
+import StoryAppDB from '/src/js/db.js';
 
 const CACHE_NAME = 'STORY-APP-V2'; // Naikkan versi jika ada perubahan besar
 
 // PERHATIAN: Service Worker tidak bisa mengakses localStorage.
 // Untuk tujuan development, Anda HARUS menempelkan token yang valid di sini
 // agar Service Worker bisa mengambil data API di latar belakang.
-const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyLWd6Q0M2RTI0d25KYzNxZFQiLCJpYXQiOjE3NDkyODc3MzN9.FYWmmlYynOBi4q3ExoCZAe6mGR7eYosOzh6hLCZSdE4';
+const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyLWd6Q0M2RTI0d25KYzNxZFQiLCJpYXQiOjE3NTA4MjE0NjV9.KkYsmKPCUBTf1yeLCKV_8TJ3XoPLoG0Yrk20i7wK7p8';
 
 // Daftar file App Shell yang akan di-cache
 const URLS_TO_CACHE = [
@@ -76,7 +76,6 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const apiUrl = 'https://story-api.dicoding.dev/v1/stories';
 
-  // Strategi untuk permintaan API (Network First, fallback to IndexedDB)
   if (request.url.startsWith(apiUrl)) {
     event.respondWith(
       fetch(request, {
@@ -87,22 +86,14 @@ self.addEventListener('fetch', (event) => {
           clonedResponse.json().then((data) => {
             if (data && data.listStory) {
               data.listStory.forEach(story => {
-                // Asumsi fungsi simpanData ada di db.js
-                // simpanData(story); 
+                // Sekarang kita bisa memanggil modul yang diimpor
+                StoryAppDB.putStory(story);
               });
             }
           });
           return networkResponse;
         })
-        .catch(async () => {
-          console.log('SW: Fetch gagal, mengambil dari IndexedDB.');
-          // const dataFromDb = await getAllData(); // Asumsi fungsi ini ada di db.js
-          // if (dataFromDb && dataFromDb.length > 0) {
-          //   return new Response(JSON.stringify({ listStory: dataFromDb }), {
-          //     headers: { 'Content-Type': 'application/json' }
-          //   });
-          // }
-        })
+        // ... sisa logika fetch
     );
     return;
   }

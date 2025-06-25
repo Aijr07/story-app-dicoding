@@ -182,27 +182,23 @@ function initializeSkipLink() {
  * Mendaftarkan Service Worker dengan path yang benar untuk Vite.
  */
 function registerServiceWorker() {
-  // Path ke sw.js, ditempatkan di folder 'public' agar konsisten
-  const swUrl = `/sw.js`; 
-  
-  // Jika menggunakan base path di vite.config.js, gunakan cara dinamis:
-  // const swUrl = `${import.meta.env.BASE_URL}sw.js`;
+  const swUrl = '/sw.js'; // Path ini sudah benar karena sw.js ada di folder public
 
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register(swUrl)
+      // PERUBAHAN DI SINI: Tambahkan opsi { type: 'module' }
+      navigator.serviceWorker.register(swUrl, { type: 'module' })
         .then(registration => {
-          console.log('Service Worker berhasil didaftarkan dengan scope:', registration.scope);
+          console.log('Service Worker berhasil didaftarkan sebagai module:', registration.scope);
         })
         .catch(error => {
-          console.error('Pendaftaran Service Worker gagal:', error);
+          console.error('Pendaftaran Service Worker module gagal:', error);
         });
     });
   } else {
     console.log('Browser ini tidak mendukung Service Worker.');
   }
 }
-
 /**
  * Menyiapkan event listener untuk seluruh aplikasi, termasuk tombol hapus.
  */
