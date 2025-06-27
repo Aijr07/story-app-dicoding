@@ -1,47 +1,44 @@
-// --- IMPORTS DAN KONSTANTA ---
-import StoryAppDB from '/src/js/db.js';
+// --- KONSTANTA ---
 
-const CACHE_NAME = 'STORY-APP-V2'; // Naikkan versi jika ada perubahan besar
+// NAIKKAN VERSI INI SETIAP KALI ANDA MENGUBAH FILE INI
+const CACHE_NAME = 'story-app-v9';
+const API_BASE_URL = 'https://story-api.dicoding.dev/v1';
+const IMAGE_CACHE_NAME = 'story-images-cache-v1';
 
-// PERHATIAN: Service Worker tidak bisa mengakses localStorage.
-// Untuk tujuan development, Anda HARUS menempelkan token yang valid di sini
-// agar Service Worker bisa mengambil data API di latar belakang.
-const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyLWd6Q0M2RTI0d25KYzNxZFQiLCJpYXQiOjE3NTA4MjE0NjV9.KkYsmKPCUBTf1yeLCKV_8TJ3XoPLoG0Yrk20i7wK7p8';
-
-// Daftar file App Shell yang akan di-cache
+// Daftar file App Shell yang akan di-cache saat instalasi.
 const URLS_TO_CACHE = [
-  // --- File Inti di Root ---
   '/',
   '/index.html',
   '/manifest.json',
-
-  // --- File Utama di dalam src ---
   '/src/main.js',
   '/src/style.css',
-
-  // --- Semua Modul JavaScript di dalam src ---
-  '/src/js/db.js',
-  '/src/js/idb.js', // Jika Anda menyimpannya secara lokal
-  '/src/models/story-api-model.js',
-  '/src/presenters/page-presenter.js',
+  '/src/db.js',
+  '/src/idb.js',
   '/src/routes/router.js',
-  '/src/utils/push-notification-helper.js',
-
-  // --- Semua View/Halaman Anda ---
   '/src/views/home-view.js',
-  '/src/views/login-view.js',
-  '/src/views/register-view.js',
-  '/src/views/add-story-view.js',
-  '/src/views/not-found-view.js',
-
-  // --- Aset Ikon (asumsi ada di folder public atau root) ---
+  // Pastikan semua file view dan utils lain yang penting ada di sini
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
-  
-  // --- Library Eksternal (jika digunakan) ---
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
 ];
+
+// --- FUNGSI HELPERS ---
+
+/**
+ * Fungsi untuk mengambil dari jaringan, dengan opsi untuk menyimpan ke cache.
+ * @param {Request} request - Permintaan yang akan di-fetch.
+ * @param {string} cacheName - Nama cache untuk menyimpan respons.
+ * @returns {Promise<Response>}
+ */
+const fetchAndCache = (request, cacheName) => {
+  return fetch(request).then((networkResponse) => {
+    // Jika berhasil, simpan salinan respons ke cache yang ditentukan
+    caches.open(cacheName).then((cache) => {
+      cache.put(request, networkResponse.clone());
+    });
+    return networkResponse;
+  });
+};
+
 // --- SIKLUS HIDUP SERVICE WORKER ---
 
 self.addEventListener('install', (event) => {
@@ -49,11 +46,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('SW: Menambahkan App Shell ke cache');
+        console.log('SW: Precaching App Shell.');
         return cache.addAll(URLS_TO_CACHE);
       })
       .then(() => self.skipWaiting())
-      .catch(err => console.error('SW: Gagal caching App Shell:', err))
   );
 });
 
@@ -62,78 +58,62 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.filter(name => name !== CACHE_NAME)
+        // Hapus semua cache LAMA, KECUALI cache gambar yang aktif
+        cacheNames.filter(name => (name !== CACHE_NAME && name !== IMAGE_CACHE_NAME))
           .map(name => caches.delete(name))
       );
     }).then(() => self.clients.claim())
   );
 });
 
-// --- PENANGANAN PERMINTAAN JARINGAN ---
+// --- PENANGANAN PERMINTAAN JARINGAN (FETCH) ---
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const apiUrl = 'https://story-api.dicoding.dev/v1/stories';
 
-  if (request.url.startsWith(apiUrl)) {
+  // --- STRATEGI #1: PRIORITAS TERTINGGI UNTUK GAMBAR (Cache First) ---
+  // Jika permintaan adalah untuk sebuah gambar, gunakan strategi ini.
+  if (request.destination === 'image') {
     event.respondWith(
-      fetch(request, {
-          headers: { 'Authorization': `Bearer ${TOKEN}` }
+      caches.match(request)
+        .then((cachedResponse) => {
+          // Jika gambar ada di cache, langsung sajikan.
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Jika tidak ada, ambil dari jaringan dan simpan ke cache gambar.
+          console.log(`SW: Gambar tidak ada di cache, mengambil: ${request.url}`);
+          return fetchAndCache(request, IMAGE_CACHE_NAME);
         })
+    );
+    return; // Hentikan eksekusi agar tidak lanjut ke strategi lain.
+  }
+
+  // --- STRATEGI #2: UNTUK PERMINTAAN API (Network First, fallback ke Cache) ---
+  if (request.url.startsWith(API_BASE_URL)) {
+    event.respondWith(
+      fetch(request)
         .then((networkResponse) => {
-          const clonedResponse = networkResponse.clone();
-          clonedResponse.json().then((data) => {
-            if (data && data.listStory) {
-              data.listStory.forEach(story => {
-                // Sekarang kita bisa memanggil modul yang diimpor
-                StoryAppDB.putStory(story);
-              });
-            }
-          });
+          // Jika online, selalu simpan respons terbaru ke cache utama.
+          const cache = caches.open(CACHE_NAME);
+          cache.then(c => c.put(request, networkResponse.clone()));
           return networkResponse;
         })
-        // ... sisa logika fetch
+        .catch(() => {
+          // Jika fetch gagal (offline), cari di cache utama.
+          console.log(`SW: API offline, mencari ${request.url} di cache.`);
+          return caches.match(request);
+        })
     );
-    return;
+    return; // Hentikan eksekusi.
   }
 
-  // Strategi untuk App Shell (Cache First)
+  // --- STRATEGI #3: UNTUK ASET LAIN / APP SHELL (Cache First) ---
+  // Ini adalah fallback untuk semua permintaan lain (CSS, JS, Font, dll).
   event.respondWith(
     caches.match(request)
-      .then((response) => {
-        return response || fetch(request);
+      .then((cachedResponse) => {
+        return cachedResponse || fetch(request);
       })
   );
-});
-
-// --- PUSH NOTIFICATION ---
-
-self.addEventListener('push', (event) => {
-  console.log('SW: Push event diterima.');
-
-  let title = 'Notifikasi Cerita Baru';
-  let options = {
-    body: 'Ada cerita baru yang ditambahkan!',
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
-    data: { url: '/#/' }
-  };
-
-  if (event.data) {
-    try {
-      const dataJson = event.data.json();
-      title = dataJson.title || title;
-      options.body = dataJson.options.body || options.body;
-    } catch (e) {
-      options.body = event.data.text();
-    }
-  }
-
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const urlToOpen = event.notification.data.url || '/';
-  event.waitUntil(clients.openWindow(urlToOpen));
 });
