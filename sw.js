@@ -81,9 +81,8 @@ self.addEventListener('fetch', (event) => {
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Jika tidak ada, ambil dari jaringan dan simpan ke cache gambar.
-          console.log(`SW: Gambar tidak ada di cache, mengambil: ${request.url}`);
-          return fetchAndCache(request, IMAGE_CACHE_NAME);
+          // Jika tidak ada, coba ambil dari jaringan.
+          return fetch(request);
         })
     );
     return; // Hentikan eksekusi agar tidak lanjut ke strategi lain.
