@@ -181,4 +181,6 @@ async function subscribeToNotifications(subscription) {
   }
 }
 
+
+
 export { registerUser, loginUser, getAllStories, addNewStory, subscribeToNotifications };

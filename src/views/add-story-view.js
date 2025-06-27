@@ -1,5 +1,5 @@
 // src/views/add-story-view.js
-
+import StoryAppDB from '/src/js/db.js';
 let cameraStream = null; // Variabel untuk menyimpan stream kamera aktif
 let capturedPhotoBlobForSubmit = null; // Variabel untuk menyimpan blob foto yang diambil dari kamera
 let locationPickerMap = null; // Variabel untuk menyimpan instance peta Leaflet pemilih lokasi
@@ -321,6 +321,69 @@ const showAddStoryError = (message) => {
     // console.warn('View: Elemen error message tidak ditemukan untuk add story.');
   }
 };
+
+function setupAddStoryForm() {
+  const addStoryForm = document.getElementById('add-story-form');
+  if (!addStoryForm) return;
+
+  addStoryForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    const photoInput = document.getElementById('photo-input');
+    const descriptionInput = document.getElementById('description-input');
+
+    const photoFile = photoInput.files[0];
+    const description = descriptionInput.value;
+
+    if (!photoFile || !description) {
+      alert('Harap isi gambar dan deskripsi.');
+      return;
+    }
+
+    // --- LOGIKA UTAMA ADA DI SINI ---
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+      // Jika browser mendukung Background Sync
+      try {
+        // Simpan data cerita ke IndexedDB untuk diunggah nanti
+        const storyToSync = {
+          id: `sync_${new Date().getTime()}`, // Buat ID unik sementara
+          photo: photoFile,
+          description: description,
+          createdAt: new Date().toISOString()
+        };
+        
+        await StoryAppDB.putStoryToSync(storyToSync); // Buat fungsi baru di db.js
+
+        // Daftarkan 'sync' task ke Service Worker
+        const registration = await navigator.serviceWorker.ready;
+        await registration.sync.register('sync-new-stories');
+
+        alert('Anda sedang offline. Cerita berhasil disimpan dan akan diunggah otomatis saat Anda kembali online.');
+        window.location.hash = '#/'; // Arahkan kembali ke halaman utama
+
+      } catch (error) {
+        console.error('Gagal menyimpan cerita untuk sinkronisasi:', error);
+        alert('Gagal menyimpan cerita untuk sinkronisasi.');
+      }
+    } else {
+      // Jika browser tidak mendukung Background Sync, coba unggah langsung
+      // (Ini adalah fallback untuk browser lama atau jika Anda online)
+      try {
+        // Panggil fungsi unggah langsung yang sudah Anda miliki
+        await uploadStoryDirectly(photoFile, description);
+        alert('Cerita berhasil diunggah!');
+        window.location.hash = '#/';
+      } catch (error) {
+        alert('Gagal mengunggah cerita. Coba lagi nanti.');
+      }
+    }
+  });
+}
+
+
+
+// Panggil fungsi ini dari router atau main.js saat halaman tambah cerita ditampilkan
+// setupAddStoryForm(); 
 
 export { 
   renderAddStory, 

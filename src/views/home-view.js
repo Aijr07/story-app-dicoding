@@ -70,6 +70,7 @@ const createStoryItemTemplate = (story) => {
   // Asumsikan API memberikan 'id' yang unik untuk setiap cerita.
   // Jika tidak, Anda perlu strategi lain untuk ID unik (misalnya, menggunakan indeks).
   const storyId = story.id || `story-item-${Math.random().toString(36).substring(2, 9)}`;
+  
 
   let locationSection = '';
   if (story.lat !== undefined && story.lon !== undefined && story.lat !== null && story.lon !== null) {
@@ -91,12 +92,22 @@ const createStoryItemTemplate = (story) => {
 
   return `
     <article class="story-item" id="story-${storyId}">
-      <img src="${imageUrl}" alt="${altText}" class="story-item__image" loading="lazy">
+      <img src="${story.photoUrl}" alt="..." class="story-item__image">
       <div class="story-item__content">
-        <h3 class="story-item__title">${storyName}</h3>
-        <p class="story-item__description">${storyDescription}</p>
-        <p class="story-item__date">Dibuat pada: ${storyDate}</p>
+        <h3 class="story-item__title">${story.name}</h3>
+        <p class="story-item__description">${story.description}</p>
+        <p class="story-item__date">...</p>
         ${locationSection}
+
+        <div class="story-item__actions">
+          <button class="button button-save-offline" data-id="${story.id}" data-status="unsaved">
+            Simpan Offline
+          </button>
+          <button class="button button-delete-offline" data-id="${story.id}" style="display: none;">
+            Hapus dari Offline
+          </button>
+        </div>
+
       </div>
     </article>
   `;
@@ -115,13 +126,13 @@ const renderHome = (container, stories = []) => {
 
   container.innerHTML = `
     <div class="page-header">
-      <h1>Daftar Cerita</h1>
+      <h1>Daftar Cerita</h1>  
       <p>Berikut adalah cerita-cerita yang telah dibagikan.</p>
     </div>
-    <div id="story-list-container" class="story-list">
+    <div id="story-list-container" class="story-list"> 
       ${stories.length > 0
         ? stories.map(createStoryItemTemplate).join('')
-        : '<p class="no-stories">Belum ada cerita untuk ditampilkan saat ini. Silakan coba lagi nanti atau tambahkan cerita baru!</p>'
+        : '<p class="no-stories">Belum ada cerita untuk ditampilkan...</p>'
       }
     </div>
   `;
