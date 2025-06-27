@@ -1,5 +1,4 @@
 // --- IMPORTS DAN KONSTANTA ---
-importScripts('https://cdn.jsdelivr.net/npm/idb@7/build/umd.js');
 import StoryAppDB from '/src/js/db.js';
 
 const CACHE_NAME = 'STORY-APP-V2'; // Naikkan versi jika ada perubahan besar
