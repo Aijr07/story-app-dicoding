@@ -7,44 +7,32 @@
  */
 
 // --- IMPORTS ---
-import './routes/router.js'; // Mengelola routing halaman
-import { requestPermissionAndSubscribe } from './utils/push-notification-helper.js'; // Mengelola notifikasi
-import StoryAppDB from './js/db.js'; // Mengelola database IndexedDB
-// Mengimpor fungsi untuk merender bagian-bagian UI dari view
+import './routes/router.js';
+import { requestPermissionAndSubscribe } from './utils/push-notification-helper.js';
+import StoryAppDB from './js/db.js';
+// Mengimpor fungsi view untuk memisahkan logika dan tampilan
 import { renderHome, showError, showLoading } from './views/home-view.js';
 
 // --- CONSTANTS ---
 const AUTH_TOKEN_KEY = 'userToken';
 const USER_NAME_KEY = 'userName';
+const IMAGE_CACHE_NAME = 'story-images-cache-v1'; // Cache khusus untuk gambar
 const mainContainer = document.querySelector('#app-content');
 
 // --- FUNGSI UTILITAS & AUTENTIKASI ---
 
-/**
- * Mengambil token autentikasi dari localStorage.
- * @returns {string|null} Token pengguna atau null.
- */
 function getAuthToken() {
   return localStorage.getItem(AUTH_TOKEN_KEY);
 }
 
-/**
- * Memperbarui tampilan navigasi dan sidebar berdasarkan status login.
- * Fungsi ini aman dijalankan online maupun offline karena membaca dari localStorage.
- */
 function updateNavigation() {
   const userInfoElement = document.getElementById('user-info');
-  if (!userInfoElement) {
-    console.error("Elemen #user-info untuk sidebar tidak ditemukan. Pastikan ada di index.html");
-    return;
-  }
+  if (!userInfoElement) return;
 
   const token = getAuthToken();
   const userName = localStorage.getItem(USER_NAME_KEY);
-
   userInfoElement.innerHTML = '';
   if (token && userName) {
-    // Tampilan sidebar saat pengguna sudah login
     userInfoElement.innerHTML = `
       <p style="font-weight: bold;">Halo, ${userName}!</p>
       <button id="subscribe-button" class="button button--primary">Aktifkan Notifikasi</button>
@@ -53,50 +41,39 @@ function updateNavigation() {
     document.getElementById('subscribe-button')?.addEventListener('click', requestPermissionAndSubscribe);
     document.getElementById('logout-button')?.addEventListener('click', handleLogout);
   } else {
-    // Tampilan sidebar saat pengguna belum login
     userInfoElement.innerHTML = `<p><a href="#/login" class="auth-link">Login</a> atau <a href="#/register" class="auth-link">Register</a></p>`;
   }
 }
 
-/**
- * Menangani proses logout.
- */
 function handleLogout() {
   localStorage.removeItem(AUTH_TOKEN_KEY);
   localStorage.removeItem(USER_NAME_KEY);
-  updateNavigation(); // Perbarui sidebar setelah logout
+  updateNavigation();
   window.location.hash = '#/login';
 }
 
 // --- LOGIKA UTAMA PENGAMBILAN & PENAMPILAN DATA ---
 
-/**
- * Fungsi cerdas untuk mengambil dan menampilkan cerita.
- * Akan mengambil dari API jika online, dan dari IndexedDB jika offline.
- */
 async function fetchAndDisplayStories() {
-  if (!mainContainer) {
-    console.error("Elemen #app-container utama tidak ditemukan.");
-    return;
-  }
+  if (!mainContainer) return;
   showLoading(mainContainer);
 
   const token = getAuthToken();
   if (!token) {
-    renderHome(mainContainer, []); // Tampilkan halaman utama kosong jika tidak login
+    renderHome(mainContainer, []);
     return;
   }
 
   const isOnline = navigator.onLine;
 
   if (isOnline) {
+    console.log("Status: ONLINE. Mengambil semua cerita dari API...");
     try {
       const response = await fetch('https://story-api.dicoding.dev/v1/stories', {
         headers: { 'Authorization': `Bearer ${token}` },
       });
       if (response.status === 401) return handleLogout();
       if (!response.ok) throw new Error(`HTTP error ${response.status}`);
-      
       const data = await response.json();
       if (data.error) throw new Error(data.message);
       renderHome(mainContainer, data.listStory);
@@ -106,7 +83,7 @@ async function fetchAndDisplayStories() {
       renderHome(mainContainer, storiesFromDb);
     }
   } else {
-    console.log("Status: OFFLINE. Mengambil data dari IndexedDB.");
+    console.log("Status: OFFLINE. Mengambil cerita yang tersimpan dari IndexedDB.");
     const storiesFromDb = await StoryAppDB.getAllStories();
     if (storiesFromDb && storiesFromDb.length > 0) {
       renderHome(mainContainer, storiesFromDb);
@@ -119,9 +96,13 @@ async function fetchAndDisplayStories() {
 
 // --- LOGIKA MANAJEMEN OFFLINE (SIMPAN/HAPUS) ---
 
+/**
+ * Menyimpan data cerita ke IndexedDB DAN file gambarnya ke Cache API.
+ * @param {string} storyId - ID dari cerita yang akan disimpan.
+ */
 async function handleSaveStory(storyId) {
   if (!storyId || !navigator.onLine) {
-    alert('Anda harus online untuk dapat menyimpan cerita pertama kali.');
+    alert('Anda harus online untuk dapat menyimpan cerita.');
     return;
   }
   const token = getAuthToken();
@@ -137,28 +118,65 @@ async function handleSaveStory(storyId) {
   }
 
   try {
+    // 1. Ambil detail cerita dari API
     const response = await fetch(`https://story-api.dicoding.dev/v1/stories/${storyId}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     const data = await response.json();
     if (data.error) throw new Error(data.message);
-    await StoryAppDB.putStory(data.story);
+    const storyData = data.story;
+
+    // 2. Simpan DATA TEKS ke IndexedDB
+    await StoryAppDB.putStory(storyData);
+    console.log(`Data cerita ${storyId} berhasil disimpan ke IndexedDB.`);
+
+    // 3. Simpan FILE GAMBAR ke Cache API
+    if (storyData.photoUrl) {
+      const cache = await caches.open(IMAGE_CACHE_NAME);
+      await cache.add(storyData.photoUrl);
+      console.log(`Gambar untuk cerita ${storyId} berhasil disimpan ke cache.`);
+    }
   } catch (error) {
     console.error(`Gagal menyimpan cerita ${storyId}:`, error);
-    alert('Gagal menyimpan cerita.');
+    alert('Gagal menyimpan cerita. Proses dibatalkan.');
   } finally {
     updateAllButtonStates();
   }
 }
 
+/**
+ * Menghapus cerita dari IndexedDB dan gambarnya dari Cache API.
+ * @param {string} storyId - ID dari cerita yang akan dihapus.
+ */
 async function handleDeleteStoryFromOffline(storyId) {
   if (!storyId) return;
   if (confirm('Hapus cerita ini dari daftar offline?')) {
-    await StoryAppDB.deleteStory(storyId);
-    updateAllButtonStates();
+    try {
+      // Ambil data cerita dulu untuk mendapatkan URL gambarnya
+      const story = await StoryAppDB.getStory(storyId);
+
+      // Hapus data dari IndexedDB
+      await StoryAppDB.deleteStory(storyId);
+      console.log(`Cerita ${storyId} dihapus dari IndexedDB.`);
+
+      // Hapus gambar dari Cache API jika ada
+      if (story && story.photoUrl) {
+        const cache = await caches.open(IMAGE_CACHE_NAME);
+        await cache.delete(story.photoUrl);
+        console.log(`Gambar untuk cerita ${storyId} berhasil dihapus dari cache.`);
+      }
+    } catch (error) {
+      console.error(`Gagal menghapus cerita ${storyId}:`, error);
+      alert('Gagal menghapus cerita.');
+    } finally {
+      updateAllButtonStates();
+    }
   }
 }
 
+/**
+ * Memperbarui UI semua tombol (Simpan/Hapus) berdasarkan status di IndexedDB.
+ */
 async function updateAllButtonStates() {
   const allStoryItems = document.querySelectorAll('.story-item');
   for (const item of allStoryItems) {
@@ -169,10 +187,10 @@ async function updateAllButtonStates() {
     const storyId = saveButton.dataset.id;
     const story = await StoryAppDB.getStory(storyId);
     
-    if (story) {
+    if (story) { // Jika cerita TERSIMPAN
       saveButton.style.display = 'none';
       deleteButton.style.display = 'inline-block';
-    } else {
+    } else { // Jika cerita TIDAK tersimpan
       saveButton.style.display = 'inline-block';
       saveButton.textContent = 'Simpan Offline';
       saveButton.disabled = false;
@@ -204,7 +222,7 @@ function setupEventListeners() {
 }
 
 function initializeApp() {
-  updateNavigation(); // Panggil pertama kali untuk memastikan sidebar langsung ter-render
+  updateNavigation();
   registerServiceWorker();
   fetchAndDisplayStories();
   setupEventListeners();
@@ -213,8 +231,6 @@ function initializeApp() {
 window.addEventListener('DOMContentLoaded', initializeApp);
 
 window.addEventListener('hashchange', () => {
-  // PERBAIKAN: Panggil updateNavigation setiap kali hash berubah
-  // untuk memastikan sidebar selalu up-to-date dengan halaman saat ini.
   updateNavigation();
   if (window.location.hash === '' || window.location.hash === '#/') {
     fetchAndDisplayStories();

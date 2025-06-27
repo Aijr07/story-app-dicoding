@@ -1,14 +1,11 @@
 // --- KONSTANTA ---
 
-// NAIKKAN VERSI INI SETIAP KALI ANDA MENGUBAH DAFTAR URLS_TO_CACHE
-const CACHE_NAME = 'STORY-APP-V7';
+// NAIKKAN VERSI INI SETIAP KALI ANDA MENGUBAH FILE INI
+const CACHE_NAME = 'story-app-v9';
 const API_BASE_URL = 'https://story-api.dicoding.dev/v1';
+const IMAGE_CACHE_NAME = 'story-images-cache-v1';
 
-// PERHATIAN: Token statis hanya untuk development dan akan kedaluwarsa.
-const TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJ1c2VyLWd6Q0M2RTI0d25KYzNxZFQiLCJpYXQiOjE3NTA4MjE0NjV9.KkYsmKPCUBTf1yeLCKV_8TJ3XoPLoG0Yrk20i7wK7p8';
-
-// PERHATIAN: Pastikan setiap path di bawah ini sudah 100% benar
-// sesuai dengan struktur folder proyek Anda.
+// Daftar file App Shell yang akan di-cache saat instalasi.
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
@@ -17,23 +14,30 @@ const URLS_TO_CACHE = [
   '/src/style.css',
   '/src/db.js',
   '/src/idb.js',
-  '/src/models/story-api-model.js',
-  '/src/presenters/page-presenter.js',
   '/src/routes/router.js',
-  '/src/utils/push-notification-helper.js',
-  '/src/views/add-story-view.js',
   '/src/views/home-view.js',
-  '/src/views/login-view.js',
-  '/src/views/not-found-view.js',
-  '/src/views/register-view.js',
+  // Pastikan semua file view dan utils lain yang penting ada di sini
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
-  'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
 ];
 
+// --- FUNGSI HELPERS ---
+
+/**
+ * Fungsi untuk mengambil dari jaringan, dengan opsi untuk menyimpan ke cache.
+ * @param {Request} request - Permintaan yang akan di-fetch.
+ * @param {string} cacheName - Nama cache untuk menyimpan respons.
+ * @returns {Promise<Response>}
+ */
+const fetchAndCache = (request, cacheName) => {
+  return fetch(request).then((networkResponse) => {
+    // Jika berhasil, simpan salinan respons ke cache yang ditentukan
+    caches.open(cacheName).then((cache) => {
+      cache.put(request, networkResponse.clone());
+    });
+    return networkResponse;
+  });
+};
 
 // --- SIKLUS HIDUP SERVICE WORKER ---
 
@@ -42,11 +46,10 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('SW: Precaching App Shell dan aset penting.');
+        console.log('SW: Precaching App Shell.');
         return cache.addAll(URLS_TO_CACHE);
       })
       .then(() => self.skipWaiting())
-      .catch(err => console.error('SW: Gagal caching App Shell:', err)) // Error #1 akan muncul di sini jika ada path yang salah
   );
 });
 
@@ -55,72 +58,62 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.filter(name => name !== CACHE_NAME)
+        // Hapus semua cache LAMA, KECUALI cache gambar yang aktif
+        cacheNames.filter(name => (name !== CACHE_NAME && name !== IMAGE_CACHE_NAME))
           .map(name => caches.delete(name))
       );
     }).then(() => self.clients.claim())
   );
 });
 
-
 // --- PENANGANAN PERMINTAAN JARINGAN (FETCH) ---
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  
-  const { url, method } = request;
-  if (request.mode === 'navigate' && request.method === 'GET' && request.headers.get('upgrade') === 'websocket') {
-    // Biarkan browser menanganinya secara normal, jangan dicegat.
-    return;
-  }
 
-  // Strategi untuk permintaan API
-  if (url.startsWith(API_BASE_URL)) {
-    // --- PERBAIKAN UNTUK ERROR #2 ---
-    // Jangan cache permintaan selain GET (seperti POST untuk tambah cerita)
-    if (method !== 'GET') {
-      // Untuk POST, dll., langsung teruskan ke jaringan tanpa caching.
-      return event.respondWith(
-          fetch(request.clone(), { headers: { 'Authorization': `Bearer ${TOKEN}` } })
-      );
-    }
-    
-    // Untuk GET, gunakan strategi Stale-While-Revalidate
+  // --- STRATEGI #1: PRIORITAS TERTINGGI UNTUK GAMBAR (Cache First) ---
+  // Jika permintaan adalah untuk sebuah gambar, gunakan strategi ini.
+  if (request.destination === 'image') {
     event.respondWith(
-      caches.open(CACHE_NAME).then((cache) => {
-        return cache.match(request).then((cachedResponse) => {
-          const fetchPromise = fetch(request, { headers: { 'Authorization': `Bearer ${TOKEN}` } })
-            .then((networkResponse) => {
-              // Simpan respons baru ke cache untuk waktu berikutnya
-              cache.put(request, networkResponse.clone());
-              return networkResponse;
-            });
-
-          // Kembalikan data dari cache jika ada (agar cepat), jika tidak, tunggu data dari jaringan.
-          return cachedResponse || fetchPromise;
-        });
-      })
+      caches.match(request)
+        .then((cachedResponse) => {
+          // Jika gambar ada di cache, langsung sajikan.
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Jika tidak ada, ambil dari jaringan dan simpan ke cache gambar.
+          console.log(`SW: Gambar tidak ada di cache, mengambil: ${request.url}`);
+          return fetchAndCache(request, IMAGE_CACHE_NAME);
+        })
     );
-    return;
+    return; // Hentikan eksekusi agar tidak lanjut ke strategi lain.
   }
 
-  // Strategi untuk aset lain (Cache First)
+  // --- STRATEGI #2: UNTUK PERMINTAAN API (Network First, fallback ke Cache) ---
+  if (request.url.startsWith(API_BASE_URL)) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          // Jika online, selalu simpan respons terbaru ke cache utama.
+          const cache = caches.open(CACHE_NAME);
+          cache.then(c => c.put(request, networkResponse.clone()));
+          return networkResponse;
+        })
+        .catch(() => {
+          // Jika fetch gagal (offline), cari di cache utama.
+          console.log(`SW: API offline, mencari ${request.url} di cache.`);
+          return caches.match(request);
+        })
+    );
+    return; // Hentikan eksekusi.
+  }
+
+  // --- STRATEGI #3: UNTUK ASET LAIN / APP SHELL (Cache First) ---
+  // Ini adalah fallback untuk semua permintaan lain (CSS, JS, Font, dll).
   event.respondWith(
     caches.match(request)
       .then((cachedResponse) => {
         return cachedResponse || fetch(request);
       })
   );
-});
-
-
-// --- PUSH NOTIFICATION & NOTIFICATION CLICK ---
-// (Tidak ada perubahan, kode Anda sudah bagus)
-
-self.addEventListener('push', (event) => {
-  // ... kode notifikasi Anda ...
-});
-
-self.addEventListener('notificationclick', (event) => {
-  // ... kode klik notifikasi Anda ...
 });
