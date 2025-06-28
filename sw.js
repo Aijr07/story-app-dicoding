@@ -1,44 +1,60 @@
-// --- KONSTANTA ---
-import StoryAppDB from '/src/js/db.js';
+// public/sw.js
+// Ini adalah satu-satunya file sw.js yang perlu Anda edit.
+// Versi ini adalah module mandiri yang tidak bergantung pada file lain dari `src`.
 
-// NAIKKAN VERSI INI SETIAP KALI ANDA MENGUBAH FILE INI
-const CACHE_NAME = 'story-app-v9';
-const API_BASE_URL = 'https://story-api.dicoding.dev/v1';
-const IMAGE_CACHE_NAME = 'story-images-cache-v1';
+// --- DATABASE LOGIC (sebelumnya ada di db.js) ---
+// Kita mengimpor library 'idb' langsung di sini. Vite akan menanganinya saat build.
+import { openDB } from 'idb';
 
-// Daftar file App Shell yang akan di-cache saat instalasi.
+const DB_NAME = 'story-app-database';
+const DB_VERSION = 1;
+const OBJECT_STORE_NAME = 'stories';
+
+const dbPromise = openDB(DB_NAME, DB_VERSION, {
+  upgrade(db) {
+    if (!db.objectStoreNames.contains(OBJECT_STORE_NAME)) {
+      db.createObjectStore(OBJECT_STORE_NAME, { keyPath: 'id' });
+    }
+  },
+});
+
+const StoryAppDB = {
+  async getAllStories() {
+    return (await dbPromise).getAll(OBJECT_STORE_NAME);
+  },
+  async putStory(story) {
+    if (!story || !story.id) return;
+    return (await dbPromise).put(OBJECT_STORE_NAME, story);
+  },
+  // Anda mungkin perlu menambahkan fungsi ini jika tombol Hapus di main.js membutuhkannya
+  async getStory(id) {
+    if (!id) return;
+    return (await dbPromise).get(OBJECT_STORE_NAME, id);
+  },
+  async deleteStory(id) {
+    if (!id) return;
+    return (await dbPromise).delete(OBJECT_STORE_NAME, id);
+  },
+};
+// --- AKHIR DARI DATABASE LOGIC ---
+
+
+// --- SERVICE WORKER CONSTANTS ---
+const CACHE_NAME = 'STORY-APP-SHELL-V13'; // Naikkan versi untuk memicu update
+const IMAGE_CACHE_NAME = 'STORY-APP-IMAGES-V1';
+// Ganti dengan token yang valid untuk pengujian
+const TOKEN = 'PASTE_YOUR_VALID_TOKEN_HERE';
+
+// Daftar URL yang akan di-cache.
+// Kita hanya perlu mendaftarkan file statis dari `public` dan root.
+// Vite akan menangani caching file JS dan CSS dari `src` secara otomatis.
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/src/main.js',
-  '/src/style.css',
-  '/src/db.js',
-  '/src/idb.js',
-  '/src/routes/router.js',
-  '/src/views/home-view.js',
-  // Pastikan semua file view dan utils lain yang penting ada di sini
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
 ];
-
-// --- FUNGSI HELPERS ---
-
-/**
- * Fungsi untuk mengambil dari jaringan, dengan opsi untuk menyimpan ke cache.
- * @param {Request} request - Permintaan yang akan di-fetch.
- * @param {string} cacheName - Nama cache untuk menyimpan respons.
- * @returns {Promise<Response>}
- */
-const fetchAndCache = (request, cacheName) => {
-  return fetch(request).then((networkResponse) => {
-    // Jika berhasil, simpan salinan respons ke cache yang ditentukan
-    caches.open(cacheName).then((cache) => {
-      cache.put(request, networkResponse.clone());
-    });
-    return networkResponse;
-  });
-};
 
 // --- SIKLUS HIDUP SERVICE WORKER ---
 
@@ -117,4 +133,33 @@ self.addEventListener('fetch', (event) => {
       return response || fetch(request);
     })
   );
+});
+
+// --- PUSH NOTIFICATION & NOTIFICATION CLICK ---
+self.addEventListener('push', (event) => {
+  console.log('SW: Push event diterima.');
+  let title = 'Notifikasi Cerita Baru';
+  let options = {
+    body: 'Ada cerita baru yang ditambahkan!',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    data: { url: '/#/' }
+  };
+
+  if (event.data) {
+    try {
+      const dataJson = event.data.json();
+      title = dataJson.title || title;
+      options.body = dataJson.options.body || options.body;
+    } catch (e) {
+      options.body = event.data.text();
+    }
+  }
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const urlToOpen = event.notification.data.url || '/';
+  event.waitUntil(clients.openWindow(urlToOpen));
 });
