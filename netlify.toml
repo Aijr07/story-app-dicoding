@@ -1,0 +1,15 @@
+# Netlify configuration file
+# File: netlify.toml
+
+# Pengaturan build dasar.
+# Ini memberitahu Netlify cara membangun proyek Anda.
+[build]
+  command = "npm run build" # Perintah untuk build proyek
+  publish = "dist"          # Folder hasil build yang akan di-deploy
+
+# Aturan pengalihan (redirect) untuk menangani SPA.
+# Ini adalah bagian terpenting untuk memperbaiki masalah Anda.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
