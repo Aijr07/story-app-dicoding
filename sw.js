@@ -3,8 +3,8 @@
 // Versi ini adalah module mandiri yang tidak bergantung pada file lain dari `src`.
 
 // --- DATABASE LOGIC (sebelumnya ada di db.js) ---
-// Kita mengimpor library 'idb' langsung di sini. Vite akan menanganinya saat build.
-import { openDB } from 'idb';
+// PERBAIKAN: Impor 'idb' langsung dari URL CDN.
+import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js';
 
 const DB_NAME = 'story-app-database';
 const DB_VERSION = 1;
