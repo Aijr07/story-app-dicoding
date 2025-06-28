@@ -1,4 +1,5 @@
 // --- KONSTANTA ---
+import StoryAppDB from '/src/js/db.js';
 
 // NAIKKAN VERSI INI SETIAP KALI ANDA MENGUBAH FILE INI
 const CACHE_NAME = 'story-app-v9';
@@ -46,10 +47,11 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('SW: Precaching App Shell.');
+        console.log('SW: Menambahkan App Shell ke cache');
         return cache.addAll(URLS_TO_CACHE);
       })
       .then(() => self.skipWaiting())
+      .catch(err => console.error('SW: Gagal caching App Shell:', err))
   );
 });
 
@@ -57,9 +59,9 @@ self.addEventListener('activate', (event) => {
   console.log('SW: Mengaktifkan...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
+      // Hapus semua cache KECUALI yang sedang digunakan
       return Promise.all(
-        // Hapus semua cache LAMA, KECUALI cache gambar yang aktif
-        cacheNames.filter(name => (name !== CACHE_NAME && name !== IMAGE_CACHE_NAME))
+        cacheNames.filter(name => name !== CACHE_NAME && name !== IMAGE_CACHE_NAME)
           .map(name => caches.delete(name))
       );
     }).then(() => self.clients.claim())
@@ -70,49 +72,40 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
+  const apiUrl = 'https://story-api.dicoding.dev/v1/stories';
 
-  // --- STRATEGI #1: PRIORITAS TERTINGGI UNTUK GAMBAR (Cache First) ---
-  // Jika permintaan adalah untuk sebuah gambar, gunakan strategi ini.
+  // Strategi untuk permintaan API (Network First)
+  if (request.url.startsWith(apiUrl)) {
+    // ... (Logika fetch API Anda tetap sama)
+    return;
+  }
+
+  // ==> STRATEGI BARU UNTUK GAMBAR (Cache First) <==
   if (request.destination === 'image') {
     event.respondWith(
-      caches.match(request)
-        .then((cachedResponse) => {
-          // Jika gambar ada di cache, langsung sajikan.
+      caches.open(IMAGE_CACHE_NAME).then((cache) => {
+        return cache.match(request).then((cachedResponse) => {
+          // Jika gambar ada di cache, langsung kembalikan
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Jika tidak ada, coba ambil dari jaringan.
-          return fetch(request);
-        })
-    );
-    return; // Hentikan eksekusi agar tidak lanjut ke strategi lain.
-  }
-
-  // --- STRATEGI #2: UNTUK PERMINTAAN API (Network First, fallback ke Cache) ---
-  if (request.url.startsWith(API_BASE_URL)) {
-    event.respondWith(
-      fetch(request)
-        .then((networkResponse) => {
-          // Jika online, selalu simpan respons terbaru ke cache utama.
-          const cache = caches.open(CACHE_NAME);
-          cache.then(c => c.put(request, networkResponse.clone()));
-          return networkResponse;
-        })
-        .catch(() => {
-          // Jika fetch gagal (offline), cari di cache utama.
-          console.log(`SW: API offline, mencari ${request.url} di cache.`);
-          return caches.match(request);
-        })
-    );
-    return; // Hentikan eksekusi.
-  }
-
-  // --- STRATEGI #3: UNTUK ASET LAIN / APP SHELL (Cache First) ---
-  // Ini adalah fallback untuk semua permintaan lain (CSS, JS, Font, dll).
-  event.respondWith(
-    caches.match(request)
-      .then((cachedResponse) => {
-        return cachedResponse || fetch(request);
+          // Jika tidak, ambil dari jaringan
+          return fetch(request).then((networkResponse) => {
+            // Simpan salinan gambar ke cache untuk penggunaan di masa depan
+            cache.put(request, networkResponse.clone());
+            // Kembalikan gambar asli ke halaman
+            return networkResponse;
+          });
+        });
       })
+    );
+    return;
+  }
+
+  // Strategi untuk App Shell (Cache First)
+  event.respondWith(
+    caches.match(request).then((response) => {
+      return response || fetch(request);
+    })
   );
 });
