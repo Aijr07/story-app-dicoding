@@ -2,48 +2,9 @@
 // Ini adalah satu-satunya file sw.js yang perlu Anda edit.
 // Versi ini adalah module mandiri yang tidak bergantung pada file lain dari `src`.
 
-// --- DATABASE LOGIC (sebelumnya ada di db.js) ---
-// PERBAIKAN: Impor 'idb' langsung dari URL CDN.
-import { openDB } from 'https://cdn.jsdelivr.net/npm/idb@7/build/umd.js';
-
-const DB_NAME = 'story-app-database';
-const DB_VERSION = 1;
-const OBJECT_STORE_NAME = 'stories';
-
-const dbPromise = openDB(DB_NAME, DB_VERSION, {
-  upgrade(db) {
-    if (!db.objectStoreNames.contains(OBJECT_STORE_NAME)) {
-      db.createObjectStore(OBJECT_STORE_NAME, { keyPath: 'id' });
-    }
-  },
-});
-
-const StoryAppDB = {
-  async getAllStories() {
-    return (await dbPromise).getAll(OBJECT_STORE_NAME);
-  },
-  async putStory(story) {
-    if (!story || !story.id) return;
-    return (await dbPromise).put(OBJECT_STORE_NAME, story);
-  },
-  // Anda mungkin perlu menambahkan fungsi ini jika tombol Hapus di main.js membutuhkannya
-  async getStory(id) {
-    if (!id) return;
-    return (await dbPromise).get(OBJECT_STORE_NAME, id);
-  },
-  async deleteStory(id) {
-    if (!id) return;
-    return (await dbPromise).delete(OBJECT_STORE_NAME, id);
-  },
-};
-// --- AKHIR DARI DATABASE LOGIC ---
-
-
 // --- SERVICE WORKER CONSTANTS ---
 const CACHE_NAME = 'STORY-APP-SHELL-V13'; // Naikkan versi untuk memicu update
 const IMAGE_CACHE_NAME = 'STORY-APP-IMAGES-V1';
-// Ganti dengan token yang valid untuk pengujian
-const TOKEN = 'PASTE_YOUR_VALID_TOKEN_HERE';
 
 // Daftar URL yang akan di-cache.
 // Kita hanya perlu mendaftarkan file statis dari `public` dan root.
@@ -86,27 +47,21 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const apiUrl = 'https://story-api.dicoding.dev/v1/stories';
 
-  // Strategi untuk API (Network First, fallback to DB)
+  // Service Worker TIDAK akan menyimpan data API ke IndexedDB lagi di sini.
+  // Logika penyimpanan dan pengambilan dari IndexedDB akan dihandle di main.js.
+  // Untuk API, kita akan menggunakan strategi Network First atau Cache First (jika sudah ada respons tersimpan).
+  // Untuk kasus ini, karena main.js yang akan memutuskan antara online/offline,
+  // SW cukup meneruskan permintaan API atau melayani dari cache jika memungkinkan.
+
   if (request.url.startsWith(apiUrl)) {
+    // Strategi Network First untuk API
     event.respondWith(
-      fetch(request, {
-        headers: { 'Authorization': `Bearer ${TOKEN}` }
-      }).then((networkResponse) => {
-        const clonedResponse = networkResponse.clone();
-        event.waitUntil(
-          clonedResponse.json().then((data) => {
-            if (data && data.listStory) {
-              data.listStory.forEach(story => StoryAppDB.putStory(story));
-            }
-          })
-        );
-        return networkResponse;
-      }).catch(async () => {
-        console.log('SW: Fetch API gagal, mengambil dari IndexedDB.');
-        const storiesFromDb = await StoryAppDB.getAllStories();
-        return new Response(JSON.stringify({ listStory: storiesFromDb }), {
-          headers: { 'Content-Type': 'application/json' }
-        });
+      fetch(request).catch(() => {
+        // Jika offline atau fetch gagal, kita tidak bisa langsung mengambil dari IndexedDB di SW
+        // karena IndexedDB hanya diakses dari main thread.
+        // Main thread akan menangani fallback ke IndexedDB-nya sendiri.
+        // SW hanya akan gagal atau mencoba dari cache (jika ada respons sebelumnya yang di-cache).
+        return caches.match(request); // Coba ambil dari cache jika gagal network
       })
     );
     return;
@@ -117,9 +72,19 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(IMAGE_CACHE_NAME).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
-          return cachedResponse || fetch(request).then((networkResponse) => {
+          // Jika ada di cache, langsung sajikan
+          if (cachedResponse) {
+            return cachedResponse;
+          }
+          // Jika tidak ada di cache, fetch dari network, lalu simpan ke cache dan sajikan
+          return fetch(request).then((networkResponse) => {
             cache.put(request, networkResponse.clone());
             return networkResponse;
+          }).catch(() => {
+            // Jika network juga gagal, bisa return placeholder atau error response
+            console.warn('SW: Gagal mengambil gambar dari cache atau network:', request.url);
+            // Contoh: return new Response(null, { status: 404, statusText: 'Not Found' });
+            return new Response('Image not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
           });
         });
       })
@@ -127,7 +92,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategi untuk App Shell (Cache First)
+  // Strategi untuk App Shell (Cache First, fallback ke Network)
   event.respondWith(
     caches.match(request).then((response) => {
       return response || fetch(request);
@@ -151,6 +116,7 @@ self.addEventListener('push', (event) => {
       const dataJson = event.data.json();
       title = dataJson.title || title;
       options.body = dataJson.options.body || options.body;
+      options.data = dataJson.options.data || options.data; // Pastikan data URL juga ditangani
     } catch (e) {
       options.body = event.data.text();
     }
