@@ -3,7 +3,7 @@
 // Versi ini adalah module mandiri yang tidak bergantung pada file lain dari `src`.
 
 // --- SERVICE WORKER CONSTANTS ---
-const CACHE_NAME = 'STORY-APP-SHELL-V13'; // Naikkan versi untuk memicu update
+const CACHE_NAME = 'STORY-APP-SHELL-V14'; // Naikkan versi untuk memicu update
 const IMAGE_CACHE_NAME = 'STORY-APP-IMAGES-V1';
 
 // Daftar URL yang akan di-cache.
