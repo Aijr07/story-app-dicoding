@@ -47,21 +47,18 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const apiUrl = 'https://story-api.dicoding.dev/v1/stories';
 
-  // Service Worker TIDAK akan menyimpan data API ke IndexedDB lagi di sini.
-  // Logika penyimpanan dan pengambilan dari IndexedDB akan dihandle di main.js.
-  // Untuk API, kita akan menggunakan strategi Network First atau Cache First (jika sudah ada respons tersimpan).
-  // Untuk kasus ini, karena main.js yang akan memutuskan antara online/offline,
-  // SW cukup meneruskan permintaan API atau melayani dari cache jika memungkinkan.
+  // --- Tambahan ini di awal fetch handler (untuk mengabaikan skema non-HTTP) ---
+  if (!request.url.startsWith('http') && !request.url.startsWith('https')) {
+    return; // Abaikan permintaan yang bukan HTTP/HTTPS (misal: chrome-extension://, file://)
+  }
+  // --- Akhir penambahan ---
 
+  // Strategi untuk API (Network First, fallback ke cache jika ada)
   if (request.url.startsWith(apiUrl)) {
-    // Strategi Network First untuk API
     event.respondWith(
       fetch(request).catch(() => {
-        // Jika offline atau fetch gagal, kita tidak bisa langsung mengambil dari IndexedDB di SW
-        // karena IndexedDB hanya diakses dari main thread.
-        // Main thread akan menangani fallback ke IndexedDB-nya sendiri.
-        // SW hanya akan gagal atau mencoba dari cache (jika ada respons sebelumnya yang di-cache).
-        return caches.match(request); // Coba ambil dari cache jika gagal network
+        // Jika network gagal, coba ambil dari Cache API (jika ada respons sebelumnya yang di-cache)
+        return caches.match(request); // Ini harus mengembalikan Response atau undefined/Promise<undefined>
       })
     );
     return;
@@ -72,19 +69,17 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(IMAGE_CACHE_NAME).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
-          // Jika ada di cache, langsung sajikan
           if (cachedResponse) {
             return cachedResponse;
           }
-          // Jika tidak ada di cache, fetch dari network, lalu simpan ke cache dan sajikan
           return fetch(request).then((networkResponse) => {
             cache.put(request, networkResponse.clone());
             return networkResponse;
           }).catch(() => {
-            // Jika network juga gagal, bisa return placeholder atau error response
+            // Ini bisa menjadi penyebab error jika mengembalikan sesuatu yang bukan Response
             console.warn('SW: Gagal mengambil gambar dari cache atau network:', request.url);
-            // Contoh: return new Response(null, { status: 404, statusText: 'Not Found' });
-            return new Response('Image not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
+            // KEMBALIKAN RESPON 404 KOSONG, BUKAN STRING BIASA
+            return new Response(null, { status: 404, statusText: 'Image Not Found' });
           });
         });
       })
@@ -95,7 +90,14 @@ self.addEventListener('fetch', (event) => {
   // Strategi untuk App Shell (Cache First, fallback ke Network)
   event.respondWith(
     caches.match(request).then((response) => {
-      return response || fetch(request);
+      return response || fetch(request).catch(() => {
+        // Jika fetch app shell gagal dan tidak ada di cache, mungkin ada offline fallback page
+        // Untuk saat ini, bisa mengembalikan Response kosong jika tidak ada fallback
+        return new Response('Offline: App shell not cached and network failed.', {
+          status: 503,
+          headers: { 'Content-Type': 'text/plain' }
+        });
+      });
     })
   );
 });
