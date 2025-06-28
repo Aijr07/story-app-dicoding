@@ -64,7 +64,7 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// --- PENANGANAN PERMINTAAN JARINGAN (FETCH) ---
+// --- PENANGANAN PERMINTAAN JARINGAN ---
 
 self.addEventListener('fetch', (event) => {
   const { request } = event;
