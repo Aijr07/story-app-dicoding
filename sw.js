@@ -46,12 +46,8 @@ self.addEventListener('install', (event) => {
   console.log('SW: Menginstal...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then((cache) => {
-        console.log('SW: Menambahkan App Shell ke cache');
-        return cache.addAll(URLS_TO_CACHE);
-      })
+      .then((cache) => cache.addAll(URLS_TO_CACHE))
       .then(() => self.skipWaiting())
-      .catch(err => console.error('SW: Gagal caching App Shell:', err))
   );
 });
 
@@ -59,9 +55,9 @@ self.addEventListener('activate', (event) => {
   console.log('SW: Mengaktifkan...');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
-      // Hapus semua cache KECUALI yang sedang digunakan
       return Promise.all(
-        cacheNames.filter(name => name !== CACHE_NAME && name !== IMAGE_CACHE_NAME)
+        cacheNames
+          .filter(name => name !== CACHE_NAME && name !== IMAGE_CACHE_NAME)
           .map(name => caches.delete(name))
       );
     }).then(() => self.clients.claim())
@@ -74,26 +70,39 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const apiUrl = 'https://story-api.dicoding.dev/v1/stories';
 
-  // Strategi untuk permintaan API (Network First)
+  // Strategi untuk API (Network First, fallback to DB)
   if (request.url.startsWith(apiUrl)) {
-    // ... (Logika fetch API Anda tetap sama)
+    event.respondWith(
+      fetch(request, {
+        headers: { 'Authorization': `Bearer ${TOKEN}` }
+      }).then((networkResponse) => {
+        const clonedResponse = networkResponse.clone();
+        event.waitUntil(
+          clonedResponse.json().then((data) => {
+            if (data && data.listStory) {
+              data.listStory.forEach(story => StoryAppDB.putStory(story));
+            }
+          })
+        );
+        return networkResponse;
+      }).catch(async () => {
+        console.log('SW: Fetch API gagal, mengambil dari IndexedDB.');
+        const storiesFromDb = await StoryAppDB.getAllStories();
+        return new Response(JSON.stringify({ listStory: storiesFromDb }), {
+          headers: { 'Content-Type': 'application/json' }
+        });
+      })
+    );
     return;
   }
 
-  // ==> STRATEGI BARU UNTUK GAMBAR (Cache First) <==
+  // Strategi untuk gambar (Cache First)
   if (request.destination === 'image') {
     event.respondWith(
       caches.open(IMAGE_CACHE_NAME).then((cache) => {
         return cache.match(request).then((cachedResponse) => {
-          // Jika gambar ada di cache, langsung kembalikan
-          if (cachedResponse) {
-            return cachedResponse;
-          }
-          // Jika tidak, ambil dari jaringan
-          return fetch(request).then((networkResponse) => {
-            // Simpan salinan gambar ke cache untuk penggunaan di masa depan
+          return cachedResponse || fetch(request).then((networkResponse) => {
             cache.put(request, networkResponse.clone());
-            // Kembalikan gambar asli ke halaman
             return networkResponse;
           });
         });
